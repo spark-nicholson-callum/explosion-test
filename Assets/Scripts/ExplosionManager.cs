@@ -9,13 +9,7 @@ public class ExplosionManager : MonoBehaviour
     [SerializeField] private float injectRadius = 1.5f;
     [SerializeField] private Transform injectionPoint = null;
 
-    private RenderTexture[] smokePropTexture = new RenderTexture[2];
-
-    // Double buffer index
-    // TODO // Probably worth it to make a class to manage this
-    private int read = 0;
-    private int write = 1;
-
+    private DoubleBuffer<RenderTexture> smokePropTexture;
     private Material rayMarchMaterial;
 
     private int initKernel;
@@ -27,13 +21,14 @@ public class ExplosionManager : MonoBehaviour
         stepKernel = fluidSimCompute.FindKernel("Step");
         fluidSimCompute.SetInt("Resolution", resolution);
 
+        smokePropTexture = new(CreateVolume(), CreateVolume());
         for (int i = 0; i < 2; ++i)
         {
-            smokePropTexture[i] = CreateVolume();
-
-            fluidSimCompute.SetTexture(initKernel, "SmokePropWrite", smokePropTexture[i]);
+            fluidSimCompute.SetTexture(initKernel, "SmokePropWrite", smokePropTexture.WriteBuffer);
             // TODO // Poll the thread group size instead
             fluidSimCompute.Dispatch(initKernel, resolution / 8, resolution / 8, resolution / 8);
+
+            smokePropTexture.SwapBuffers();
         }
 
         rayMarchMaterial = GetComponent<Renderer>().material;
@@ -67,22 +62,19 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetVector("InjectWorldPos", injectPos);
         fluidSimCompute.SetFloat("InjectRadius", injectRadius);
 
-        fluidSimCompute.SetTexture(stepKernel, "SmokePropRead", smokePropTexture[read]);
-        fluidSimCompute.SetTexture(stepKernel, "SmokePropWrite", smokePropTexture[write]);
+        fluidSimCompute.SetTexture(stepKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
+        fluidSimCompute.SetTexture(stepKernel, "SmokePropWrite", smokePropTexture.WriteBuffer);
 
         // TODO // Poll the thread group size instead
         fluidSimCompute.Dispatch(stepKernel, resolution / 8, resolution / 8, resolution / 8);
 
-        rayMarchMaterial.SetTexture("_VolumeTex", smokePropTexture[write]);
+        rayMarchMaterial.SetTexture("_VolumeTex", smokePropTexture.WriteBuffer);
 
-        (read, write) = (write, read);
+        smokePropTexture.SwapBuffers();
     }
 
     void OnDestroy()
     {
-        for (int i = 0; i < 2; ++i)
-        {
-            if (smokePropTexture[i] != null) smokePropTexture[i].Release();
-        }
+        smokePropTexture.ForEach(t => {if (t != null) t.Release();});
     }
 }
