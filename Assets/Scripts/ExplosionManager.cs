@@ -16,11 +16,17 @@ public class ExplosionManager : MonoBehaviour
     private int initKernel;
     private int stepKernel;
 
+    private int threadGroups;
+
     void Start()
     {
         initKernel = fluidSimCompute.FindKernel("Init");
         stepKernel = fluidSimCompute.FindKernel("Step");
         fluidSimCompute.SetInt("Resolution", resolution);
+
+        uint groupSize;
+        fluidSimCompute.GetKernelThreadGroupSizes(initKernel, out groupSize, out _, out _);
+        threadGroups = resolution / (int)groupSize;
 
         smokePropTexture = new(CreateVolume(), CreateVolume());
         velocityTexture = new(CreateVolume(), CreateVolume());
@@ -28,8 +34,7 @@ public class ExplosionManager : MonoBehaviour
         {
             fluidSimCompute.SetTexture(initKernel, "SmokePropWrite", smokePropTexture.WriteBuffer);
             fluidSimCompute.SetTexture(initKernel, "VelocityWrite", velocityTexture.WriteBuffer);
-            // TODO // Poll the thread group size instead
-            fluidSimCompute.Dispatch(initKernel, resolution / 8, resolution / 8, resolution / 8);
+            fluidSimCompute.Dispatch(initKernel, threadGroups, threadGroups, threadGroups);
 
             smokePropTexture.SwapBuffers();
         }
@@ -71,8 +76,7 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetTexture(stepKernel, "SmokePropWrite", smokePropTexture.WriteBuffer);
         fluidSimCompute.SetTexture(stepKernel, "VelocityWrite", velocityTexture.WriteBuffer);
 
-        // TODO // Poll the thread group size instead
-        fluidSimCompute.Dispatch(stepKernel, resolution / 8, resolution / 8, resolution / 8);
+        fluidSimCompute.Dispatch(stepKernel, threadGroups, threadGroups, threadGroups);
 
         rayMarchMaterial.SetTexture("_VolumeTex", smokePropTexture.WriteBuffer);
 

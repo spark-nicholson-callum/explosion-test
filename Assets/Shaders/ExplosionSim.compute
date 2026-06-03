@@ -1,3 +1,5 @@
+#define GROUP_SIZE 8
+
 #pragma kernel Init
 #pragma kernel Step
 
@@ -30,13 +32,13 @@ float3 InjectWorldPos;
 float InjectRadius;
 bool IsInjecting;
 
-[numthreads(8, 8, 8)]
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
 void Init (uint3 id : SV_DispatchThreadID)
 {
     SmokePropWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
 }
 
-[numthreads(8, 8, 8)]
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
 void Step (uint3 id : SV_DispatchThreadID)
 {
     // +.5 to sample the center of the the voxel
