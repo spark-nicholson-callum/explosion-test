@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public class ExplosionManager : MonoBehaviour
 {
@@ -43,9 +44,9 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetFloat("Time", Time.time);
         fluidSimCompute.SetFloat("DeltaTime", Time.deltaTime);
 
-        if (Input.GetKeyDown(KeyCode.Space))
+        if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
         {
-            fluidSimCompute.Dispatch(injectKernel, resolution / 8, resolution / 8, resolution / 8);
+            fluidSimCompute.Dispatch(injectKernel, resolution / 8, resolution / 8, resolution /8);
         }
 
         fluidSimCompute.Dispatch(simulateKernel, resolution / 8, resolution / 8, resolution / 8);
