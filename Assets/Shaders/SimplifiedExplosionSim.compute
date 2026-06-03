@@ -1,4 +1,3 @@
-// Geminiちゃんのコード
 #pragma kernel Initialize
 #pragma kernel InjectDensity
 #pragma kernel Simulate
@@ -10,6 +9,15 @@ float Time;
 float DeltaTime;
 uint Resolution;
 
+// World Space
+float3 BoundsMin;
+float3 BoundsSize;
+float SimScale;
+
+// Injection Data
+float3 InjectWorldPos;
+float InjectRadius;
+
 [numthreads(8, 8, 8)]
 void Initialize (uint3 id : SV_DispatchThreadID)
 {
@@ -19,12 +27,13 @@ void Initialize (uint3 id : SV_DispatchThreadID)
 [numthreads(8, 8, 8)]
 void InjectDensity (uint3 id : SV_DispatchThreadID)
 {
-    // Find the center of the 3D volume
-    float3 center = float3(Resolution, Resolution, Resolution) * 0.5;
-    float dist = distance(float3(id), center);
+    // +.5 to sample the center of the the voxel
+    float3 uvw = ((float3(id) + 0.5) / float(Resolution));
+    float3 center = BoundsMin + (uvw * BoundsSize);
+    float dist = distance(center, InjectWorldPos);
 
     // Inject a sphere of density/heat at the center
-    if (dist < Resolution * 0.1)
+    if (dist < InjectRadius)
     {
         VolumeTexture[id] = float4(1.0, 1.0, 0.0, 0.0);
     }
@@ -35,12 +44,9 @@ void Simulate (uint3 id : SV_DispatchThreadID)
 {
     float4 cellData = VolumeTexture[id];
 
-    // Dissipate density and heat over time
+    // For now just gently diffuse
     cellData.x = max(0.0, cellData.x - (0.5 * DeltaTime)); // Fade density (smoke)
     cellData.y = max(0.0, cellData.y - (1.5 * DeltaTime)); // Fade heat (fire) faster
-
-    // In a real fluid sim, you would sample neighbors here to calculate
-    // advection (movement) and pressure.
 
     VolumeTexture[id] = cellData;
 }
