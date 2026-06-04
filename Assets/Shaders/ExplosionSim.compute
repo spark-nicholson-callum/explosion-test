@@ -115,9 +115,8 @@ void PressureIteration(
     {
         uint3 pos = GetCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
-        globalPos = max(int3(0, 0, 0), globalPos);
-        globalPos = min(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
-        pressureCache[i] = PressureRead[globalPos];
+        bool isOutside = any(globalPos < 0) || any(globalPos >= int3(Resolution, Resolution, Resolution));
+        pressureCache[i] = isOutside ? 0.0 : PressureRead[globalPos];
     }
 
     GroupMemoryBarrierWithGroupSync();
@@ -149,9 +148,8 @@ void ProjectVelocity(
     {
         uint3 pos = GetCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
-        globalPos = max(int3(0, 0, 0), globalPos);
-        globalPos = min(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
-        pressureCache[i] = PressureRead[globalPos];
+        bool isOutside = any(globalPos < 0) || any(globalPos >= int3(Resolution, Resolution, Resolution));
+        pressureCache[i] = isOutside ? 0.0 : PressureRead[globalPos];
     }
 
     GroupMemoryBarrierWithGroupSync();
@@ -199,7 +197,7 @@ void Step(uint3 id : SV_DispatchThreadID)
     }
 
     // Temp diffusion (temp)
-    advectedSmokeProps.r = max(0.0, advectedSmokeProps.r - (0.5 * DeltaTime));
+    //advectedSmokeProps.r = max(0.0, advectedSmokeProps.r - (0.5 * DeltaTime));
     advectedSmokeProps.g = max(0.0, advectedSmokeProps.g - (1.5 * DeltaTime));
 
     SmokePropWrite[id] = advectedSmokeProps;

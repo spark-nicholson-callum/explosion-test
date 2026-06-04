@@ -90,7 +90,7 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetVector("BoundsSize", bounds.size);
 
         // Check if we should inject
-        bool spacePressed = (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame);
+        bool spacePressed = (Keyboard.current != null && Keyboard.current.spaceKey.isPressed);
         fluidSimCompute.SetBool("IsInjecting", spacePressed);
 
         // Injection parameters
