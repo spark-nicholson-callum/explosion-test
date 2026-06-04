@@ -1,4 +1,7 @@
 #define GROUP_SIZE 8
+#define CACHE_SIZE (GROUP_SIZE + 2) // 10
+#define TOTAL_THREADS (GROUP_SIZE * GROUP_SIZE * GROUP_SIZE) // 512
+#define TOTAL_CACHE (CACHE_SIZE * CACHE_SIZE * CACHE_SIZE) // 1000
 
 #pragma kernel Init
 #pragma kernel ComputeDivergence
@@ -36,9 +39,21 @@ float3 InjectWorldPos;
 float InjectRadius;
 bool IsInjecting;
 
-struct Stencil3 {
-    float3 L, R, D, U, B, F;
-};
+// Groupshare Cache
+groupshared float3 velCache[TOTAL_CACHE];
+
+uint GetCacheIndex(uint3 pos)
+{
+    return ((pos.z * CACHE_SIZE) + pos.y) * CACHE_SIZE + pos.x;
+}
+
+uint3 GetCachePos(uint i)
+{
+    uint z = i / (CACHE_SIZE * CACHE_SIZE);
+    uint y = (i / CACHE_SIZE) % CACHE_SIZE;
+    uint x = i % CACHE_SIZE;
+    return uint3(x, y, z);
+}
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
 void Init(uint3 id : SV_DispatchThreadID)
@@ -49,20 +64,33 @@ void Init(uint3 id : SV_DispatchThreadID)
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
-void ComputeDivergence(uint3 id : SV_DispatchThreadID)
-{
-    float3 uvw = (float3(id) + 0.5) / float(Resolution);
-    float offset = 1.0 / float(Resolution);
+void ComputeDivergence(
+    uint3 id : SV_GroupThreadId,
+    uint3 groupId : SV_GroupID,
+    uint groupIndex : SV_GroupIndex
+) {
+    [unroll]
+    for (uint i = groupIndex; i < TOTAL_CACHE; i += TOTAL_THREADS)
+    {
+        uint3 pos = GetCachePos(i);
+        int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
+
+        float3 uvw = (float3(globalPos) + 0.5) / float(Resolution);
+        velCache[i] = VelocityRead.SampleLevel(sampler_LinearClamp, uvw, 0).xyz;
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    uint3 pos = id + uint3(1, 1, 1); // Offset for the padding
+
+    float3 vL = velCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+    float3 vR = velCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+    float3 vD = velCache[GetCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+    float3 vU = velCache[GetCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+    float3 vB = velCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+    float3 vF = velCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
     float dx = BoundsSize.x / float(Resolution);
-
-    float3 vL = VelocityRead.SampleLevel(sampler_LinearClamp, uvw + float3(-offset, 0, 0), 0).xyz;
-    float3 vR = VelocityRead.SampleLevel(sampler_LinearClamp, uvw + float3( offset, 0, 0), 0).xyz;
-    float3 vD = VelocityRead.SampleLevel(sampler_LinearClamp, uvw + float3(0, -offset, 0), 0).xyz;
-    float3 vU = VelocityRead.SampleLevel(sampler_LinearClamp, uvw + float3(0,  offset, 0), 0).xyz;
-    float3 vB = VelocityRead.SampleLevel(sampler_LinearClamp, uvw + float3(0, 0, -offset), 0).xyz;
-    float3 vF = VelocityRead.SampleLevel(sampler_LinearClamp, uvw + float3(0, 0,  offset), 0).xyz;
-
     DivergenceWrite[id] = ((vR.x - vL.x) + (vU.y - vD.y) + (vF.z - vB.z)) / (2.0 * dx);
 }
 
