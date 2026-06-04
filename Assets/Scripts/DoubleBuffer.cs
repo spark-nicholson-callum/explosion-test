@@ -9,11 +9,10 @@ public class DoubleBuffer<T>
     public T ReadBuffer => buffers[readIndex];
     public T WriteBuffer => buffers[writeIndex];
 
-    public DoubleBuffer(T buffer1, T buffer2)
-    {
-        buffers[readIndex] = buffer1;
-        buffers[writeIndex] = buffer2;
-    } 
+    public DoubleBuffer(Func<T> generator) {
+        buffers[readIndex] = generator();
+        buffers[writeIndex] = generator();
+    }
 
     public void ForEach(Action<T> action) {
         action(ReadBuffer);

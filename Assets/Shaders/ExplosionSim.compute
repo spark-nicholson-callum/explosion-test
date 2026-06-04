@@ -1,14 +1,18 @@
 #define GROUP_SIZE 8
 
 #pragma kernel Init
+#pragma kernel ComputeDivergence
 #pragma kernel Step
 
 // r = heat, g = smoke density
-RWTexture3D<float4> SmokePropWrite;
 RWTexture3D<float4> VelocityWrite;
-
-Texture3D<float4> SmokePropRead;
 Texture3D<float4> VelocityRead;
+
+RWTexture3D<float> DivergenceWrite;
+Texture3D<float4> DivergenceRead;
+
+RWTexture3D<float4> SmokePropWrite;
+Texture3D<float4> SmokePropRead;
 
 SamplerState sampler_LinearClamp
 {
@@ -32,14 +36,38 @@ float3 InjectWorldPos;
 float InjectRadius;
 bool IsInjecting;
 
+struct Stencil3 {
+    float3 L, R, D, U, B, F;
+};
+
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
-void Init (uint3 id : SV_DispatchThreadID)
+void Init(uint3 id : SV_DispatchThreadID)
 {
+    VelocityWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
+    DivergenceWrite[id] = 0.0;
     SmokePropWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
-void Step (uint3 id : SV_DispatchThreadID)
+void ComputeDivergence(uint3 id : SV_DispatchThreadID)
+{
+    float3 uvw = (float3(id) + 0.5) / float(Resolution);
+    float offset = 1.0 / float(Resolution);
+
+    float dx = BoundsSize.x / float(Resolution);
+
+    float3 vL = VelocityRead.SampleLevel(sampler_LinearClamp, uvw + float3(-offset, 0, 0), 0).xyz;
+    float3 vR = VelocityRead.SampleLevel(sampler_LinearClamp, uvw + float3( offset, 0, 0), 0).xyz;
+    float3 vD = VelocityRead.SampleLevel(sampler_LinearClamp, uvw + float3(0, -offset, 0), 0).xyz;
+    float3 vU = VelocityRead.SampleLevel(sampler_LinearClamp, uvw + float3(0,  offset, 0), 0).xyz;
+    float3 vB = VelocityRead.SampleLevel(sampler_LinearClamp, uvw + float3(0, 0, -offset), 0).xyz;
+    float3 vF = VelocityRead.SampleLevel(sampler_LinearClamp, uvw + float3(0, 0,  offset), 0).xyz;
+
+    DivergenceWrite[id] = ((vR.x - vL.x) + (vU.y - vD.y) + (vF.z - vB.z)) / (2.0 * dx);
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
+void Step(uint3 id : SV_DispatchThreadID)
 {
     // +.5 to sample the center of the the voxel
     float3 uvw = ((float3(id) + 0.5) / float(Resolution));
