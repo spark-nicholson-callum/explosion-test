@@ -5,6 +5,7 @@
 
 #pragma kernel Init
 #pragma kernel ComputeDivergence
+#pragma kernel PressureIteration
 #pragma kernel Step
 
 // r = heat, g = smoke density
@@ -12,7 +13,10 @@ RWTexture3D<float4> VelocityWrite;
 Texture3D<float4> VelocityRead;
 
 RWTexture3D<float> DivergenceWrite;
-Texture3D<float4> DivergenceRead;
+Texture3D<float> DivergenceRead;
+
+RWTexture3D<float> PressureWrite;
+Texture3D<float> PressureRead;
 
 RWTexture3D<float4> SmokePropWrite;
 Texture3D<float4> SmokePropRead;
@@ -41,6 +45,7 @@ bool IsInjecting;
 
 // Groupshare Cache
 groupshared float3 velCache[TOTAL_CACHE];
+groupshared float pressureCache[TOTAL_CACHE];
 
 uint GetCacheIndex(uint3 pos)
 {
@@ -60,13 +65,15 @@ void Init(uint3 id : SV_DispatchThreadID)
 {
     VelocityWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
     DivergenceWrite[id] = 0.0;
+    PressureWrite[id] = 0.0;
     SmokePropWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
 void ComputeDivergence(
-    uint3 id : SV_GroupThreadId,
+    uint3 id : SV_DispatchThreadID,
     uint3 groupId : SV_GroupID,
+    uint3 groupThreadId : SV_GroupThreadId,
     uint groupIndex : SV_GroupIndex
 ) {
     [unroll]
@@ -81,7 +88,7 @@ void ComputeDivergence(
 
     GroupMemoryBarrierWithGroupSync();
 
-    uint3 pos = id + uint3(1, 1, 1); // Offset for the padding
+    uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
 
     float3 vL = velCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
     float3 vR = velCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
@@ -92,6 +99,39 @@ void ComputeDivergence(
 
     float dx = BoundsSize.x / float(Resolution);
     DivergenceWrite[id] = ((vR.x - vL.x) + (vU.y - vD.y) + (vF.z - vB.z)) / (2.0 * dx);
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
+void PressureIteration(
+    uint3 id : SV_DispatchThreadID,
+    uint3 groupId : SV_GroupID,
+    uint3 groupThreadId : SV_GroupThreadId,
+    uint groupIndex : SV_GroupIndex
+) {
+    [unroll]
+    for (uint i = groupIndex; i < TOTAL_CACHE; i += TOTAL_THREADS)
+    {
+        uint3 pos = GetCachePos(i);
+        int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
+
+        float3 uvw = (float3(globalPos) + 0.5) / float(Resolution);
+        pressureCache[i] = PressureRead.SampleLevel(sampler_LinearClamp, uvw, 0);
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+
+    uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
+
+    float pL = pressureCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+    float pR = pressureCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+    float pD = pressureCache[GetCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+    float pU = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+    float pB = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+    float pF = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
+
+    float dx = BoundsSize.x / float(Resolution);
+    float div = DivergenceRead[id];
+    DivergenceWrite[id] = (pL + pR + pD + pU + pB + pF - (dx * dx * div)) / 6.0;
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]

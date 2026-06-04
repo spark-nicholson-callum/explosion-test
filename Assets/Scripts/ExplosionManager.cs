@@ -11,6 +11,7 @@ public class ExplosionManager : MonoBehaviour
 
     private DoubleBuffer<RenderTexture> velocityTexture;
     private DoubleBuffer<RenderTexture> divergenceTexture;
+    private DoubleBuffer<RenderTexture> pressureTexture;
     private DoubleBuffer<RenderTexture> smokePropTexture;
     private Material rayMarchMaterial;
 
@@ -33,11 +34,13 @@ public class ExplosionManager : MonoBehaviour
 
         velocityTexture = new(() => CreateVolume());
         divergenceTexture = new(() => CreateVolume(RenderTextureFormat.RHalf));
+        pressureTexture = new(() => CreateVolume(RenderTextureFormat.RHalf));
         smokePropTexture = new(() => CreateVolume());
         for (int i = 0; i < 2; ++i)
         {
             fluidSimCompute.SetTexture(initKernel, "VelocityWrite", velocityTexture.WriteBuffer);
             fluidSimCompute.SetTexture(initKernel, "DivergenceWrite", divergenceTexture.WriteBuffer);
+            fluidSimCompute.SetTexture(initKernel, "PressureWrite", pressureTexture.WriteBuffer);
             fluidSimCompute.SetTexture(initKernel, "SmokePropWrite", smokePropTexture.WriteBuffer);
             fluidSimCompute.Dispatch(initKernel, threadGroups, threadGroups, threadGroups);
 
@@ -103,6 +106,8 @@ public class ExplosionManager : MonoBehaviour
     void OnDestroy()
     {
         smokePropTexture.ForEach(t => {if (t != null) t.Release();});
+        divergenceTexture.ForEach(t => {if (t != null) t.Release();});
+        pressureTexture.ForEach(t => {if (t != null) t.Release();});
         velocityTexture.ForEach(t => {if (t != null) t.Release();});
     }
 }
