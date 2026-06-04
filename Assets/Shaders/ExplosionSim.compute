@@ -82,12 +82,13 @@ void ComputeDivergence(
     {
         uint3 pos = GetCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
-        globalPos = min(int3(0, 0, 0), globalPos);
-        globalPos = max(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
+        globalPos = max(int3(0, 0, 0), globalPos);
+        globalPos = min(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
         velCache[i] = VelocityRead[globalPos].xyz;
     }
 
     GroupMemoryBarrierWithGroupSync();
+    if (id.x >= Resolution || id.y >= Resolution || id.z >= Resolution) return;
 
     uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
 
@@ -114,12 +115,13 @@ void PressureIteration(
     {
         uint3 pos = GetCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
-        globalPos = min(int3(0, 0, 0), globalPos);
-        globalPos = max(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
+        globalPos = max(int3(0, 0, 0), globalPos);
+        globalPos = min(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
         pressureCache[i] = PressureRead[globalPos];
     }
 
     GroupMemoryBarrierWithGroupSync();
+    if (id.x >= Resolution || id.y >= Resolution || id.z >= Resolution) return;
 
     uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
 
@@ -147,12 +149,13 @@ void ProjectVelocity(
     {
         uint3 pos = GetCachePos(i);
         int3 globalPos = int3(groupId * GROUP_SIZE) + int3(pos) - int3(1, 1, 1);
-        globalPos = min(int3(0, 0, 0), globalPos);
-        globalPos = max(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
+        globalPos = max(int3(0, 0, 0), globalPos);
+        globalPos = min(globalPos, int3(Resolution-1, Resolution-1, Resolution-1));
         pressureCache[i] = PressureRead[globalPos];
     }
 
     GroupMemoryBarrierWithGroupSync();
+    if (id.x >= Resolution || id.y >= Resolution || id.z >= Resolution) return;
 
     uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
 
