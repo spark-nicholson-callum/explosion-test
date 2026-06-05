@@ -61,8 +61,8 @@ Shader "Custom/VolumeRayMarch"
                     if (any(rayPos < 0) || any(rayPos > 1)) break;
 
                     float4 volumeData = tex3D(_VolumeTex, rayPos);
-                    float density = volumeData.r;
-                    float heat = volumeData.g;
+                    float heat = volumeData.r;
+                    float density = volumeData.g;
 
                     if (density > 0.01)
                     {

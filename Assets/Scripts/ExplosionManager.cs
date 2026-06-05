@@ -14,12 +14,15 @@ public class ExplosionManager : MonoBehaviour
     [SerializeField] private float simScale = 1.0f;
     [SerializeField] private float injectRadius = 1.5f;
     [SerializeField] private Transform injectionPoint = null;
+    [SerializeField] private float expansionForce = 50.0f;
     [SerializeField] private int pressureIterations = 40;
 
     [Header("Forces")]
     [SerializeField] private float buoyancyStrength = 15.0f;
     [SerializeField] private float smokeWeight = 2.0f;
     [SerializeField] private float vorticityStrength = 20.0f;
+    [SerializeField] private float ambientWindScale = 1.5f;
+    [SerializeField] private float ambientWindSpeed = 2.0f;
 
     [Header("Debugging")]
     [SerializeField] private DebugMode debugMode = DebugMode.None;
@@ -112,6 +115,7 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetBool("IsInjecting", spacePressed);
         fluidSimCompute.SetVector("InjectWorldPos", injectPos);
         fluidSimCompute.SetFloat("InjectRadius", injectRadius);
+        fluidSimCompute.SetFloat("ExpansionForce", expansionForce);
 
         // Advection Step
         fluidSimCompute.SetTexture(stepKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
@@ -134,6 +138,8 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetFloat("Buoyancy", buoyancyStrength);
         fluidSimCompute.SetFloat("SmokeWeight", smokeWeight);
         fluidSimCompute.SetFloat("VorticityStrength", vorticityStrength);
+        fluidSimCompute.SetFloat("AmbientWindScale", ambientWindScale);
+        fluidSimCompute.SetFloat("AmbientWindSpeed", ambientWindSpeed);
         fluidSimCompute.SetTexture(externalForcesKernel, "VelocityRead", velocityTexture.ReadBuffer);
         fluidSimCompute.SetTexture(externalForcesKernel, "VelocityWrite", velocityTexture.WriteBuffer);
         fluidSimCompute.SetTexture(externalForcesKernel, "SmokePropRead", smokePropTexture.ReadBuffer);

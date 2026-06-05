@@ -48,11 +48,14 @@ float SimScale;
 float3 InjectWorldPos;
 float InjectRadius;
 bool IsInjecting;
+float ExpansionForce;
 
 // Force Variables
 float Buoyancy;
 float SmokeWeight;
 float VorticityStrength;
+float AmbientWindScale;
+float AmbientWindSpeed;
 
 // Groupshare Cache
 groupshared float3 velCache[TOTAL_CACHE];
@@ -172,6 +175,17 @@ void ExternalForces(
         vel += vorticityForce * DeltaTime;
     }
 
+    // Cheat ambient wind
+    float3 uvw = (float3(id) + 0.5) / float(Resolution);
+    float3 worldPos = BoundsMin + (uvw * BoundsSize);
+
+    float3 wind;
+    wind.x = sin(worldPos.y * AmbientWindScale + Time) * cos(worldPos.z * AmbientWindScale + Time);
+    wind.y = sin(worldPos.z * AmbientWindScale + Time) * cos(worldPos.x * AmbientWindScale + Time);
+    wind.z = sin(worldPos.x * AmbientWindScale + Time) * cos(worldPos.y * AmbientWindScale + Time);
+
+    vel += wind * AmbientWindSpeed * DeltaTime;
+
     VelocityWrite[id] = float4(vel, 0.0);
 }
 
@@ -205,7 +219,16 @@ void ComputeDivergence(
     float3 vF = velCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
 
     float dx = BoundsSize.x / float(Resolution);
-    DivergenceWrite[id] = ((vR.x - vL.x) + (vU.y - vD.y) + (vF.z - vB.z)) / (2.0 * dx);
+    float div = ((vR.x - vL.x) + (vU.y - vD.y) + (vF.z - vB.z)) / (2.0 * dx);
+
+    float3 uvw = (float3(id) + 0.5) / float(Resolution);
+    float3 worldPos = BoundsMin + (uvw * BoundsSize);
+    if (IsInjecting && distance(worldPos, InjectWorldPos) < InjectRadius)
+    {
+        div -= ExpansionForce;
+    }
+
+    DivergenceWrite[id] = div;
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
@@ -297,13 +320,11 @@ void Step(uint3 id : SV_DispatchThreadID)
     if (IsInjecting && distance(cellWorldPos, InjectWorldPos) < InjectRadius)
     {
         advectedSmokeProps = float4(1.0, 1.0, 0.0, 0.0);
-        float3 burstDir = normalize(cellWorldPos - InjectWorldPos);
-        advectedVel.xyz = burstDir * 5.0;
     }
 
     // Temp diffusion (temp)
     advectedSmokeProps.r = max(0.0, advectedSmokeProps.r - (0.5 * DeltaTime));
-    advectedSmokeProps.g = max(0.0, advectedSmokeProps.g - (1.5 * DeltaTime));
+    advectedSmokeProps.g = max(0.0, advectedSmokeProps.g - (0.1 * DeltaTime));
 
     SmokePropWrite[id] = advectedSmokeProps;
     VelocityWrite[id] = advectedVel;
