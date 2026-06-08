@@ -71,21 +71,6 @@ public class ExplosionManager : MonoBehaviour
         pressureTexture   = new(() => CreateVolume(RenderTextureFormat.RHalf));
         smokePropTexture  = new(() => CreateVolume());
 
-        // Create buffers
-        FluidEmitter[] emitters = FindObjectsByType<FluidEmitter>();
-        fluidSimCompute.SetInt("EmitterCount", emitters.Length);
-        if (emitters.Length > 0)
-        {
-            emitterBuffer = new ComputeBuffer(emitters.Length, FluidEmitter.DataSize);
-            emitterData= emitters
-                .Select(x => x.GetEmitterData())
-                .ToArray();
-
-            emitterBuffer.SetData(emitterData);
-            fluidSimCompute.SetBuffer(stepKernel, "Emitters", emitterBuffer);
-            fluidSimCompute.SetBuffer(divergenceKernel, "Emitters", emitterBuffer);
-        }
-
         for (int i = 0; i < 2; ++i)
         {
             fluidSimCompute.SetTexture(initKernel, "VelocityWrite", velocityTexture.WriteBuffer);
@@ -127,9 +112,32 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetVector("BoundsMin", bounds.min);
         fluidSimCompute.SetVector("BoundsSize", bounds.size);
 
-        // Injection parameters
+        // Injection parameters / Emitters
         bool spacePressed = (Keyboard.current != null && Keyboard.current.spaceKey.isPressed);
         fluidSimCompute.SetBool("IsInjecting", spacePressed);
+
+        FluidEmitter[] emitters = transform.GetComponentsInChildren<FluidEmitter>();
+        fluidSimCompute.SetInt("EmitterCount", emitters.Length);
+        if (emitters.Length > 0)
+        {
+            if (emitterBuffer != null && emitterBuffer.count != emitters.Length)
+            {
+                emitterBuffer.Release();
+                emitterBuffer = null;
+            }
+            if (emitterBuffer == null)
+            {
+                emitterBuffer = new ComputeBuffer(emitters.Length, FluidEmitter.DataSize);
+            }
+
+            emitterData= emitters
+                .Select(x => x.GetEmitterData())
+                .ToArray();
+
+            emitterBuffer.SetData(emitterData);
+            fluidSimCompute.SetBuffer(stepKernel, "Emitters", emitterBuffer);
+            fluidSimCompute.SetBuffer(divergenceKernel, "Emitters", emitterBuffer);
+        }
 
         // Advection Step
         fluidSimCompute.SetTexture(stepKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
