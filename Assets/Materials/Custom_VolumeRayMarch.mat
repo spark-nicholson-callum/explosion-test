@@ -117,11 +117,14 @@ Material:
     - _DetailNormalMapScale: 1
     - _DstBlend: 10
     - _DstBlendAlpha: 10
+    - _EmissionIntensity: 15
     - _EnvironmentReflections: 1
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
+    - _MaxTemperature: 30
     - _Metallic: 0
+    - _MinTemperature: 10
     - _NoiseScale: 1
     - _NoiseSpeed: 0.5
     - _NoiseStrength: 0.33

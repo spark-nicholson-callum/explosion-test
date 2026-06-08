@@ -9,6 +9,11 @@ Shader "Custom/VolumeRayMarch"
         _NoiseScale ("Noise Scale", Float) = 10.0
         _NoiseStrength ("Noise Strength", Range(0.0, 2.0)) = 1.0
         _NoiseSpeed ("Noise Animation Speed", Float) = 0.5
+
+        [Header(Temprature Settings)]
+        _MinTemperature ("Minimum Temperature", Float) = 10.0
+        _MaxTemperature ("Maximum Temperature", Float) = 30.0
+        _EmissionIntensity ("Emission Intensity", Float) = 10.0
     }
     SubShader
     {
@@ -52,6 +57,10 @@ Shader "Custom/VolumeRayMarch"
                 float _NoiseScale;
                 float _NoiseStrength;
                 float _NoiseSpeed;
+
+                float _MinTemperature;
+                float _MaxTemperature;
+                float _EmissionIntensity;
             CBUFFER_END
 
             float noise3D(float3 x)
@@ -86,6 +95,21 @@ Shader "Custom/VolumeRayMarch"
                     amp *= 0.5;
                 }
                 return f;
+            }
+
+            float3 blackbodyColor(float heat)
+            {
+                float thresh = _MinTemperature / _MaxTemperature;
+                heat -= thresh;
+
+                // Tanner Helland approximation for < 6600K
+                float temp = lerp(_MinTemperature, _MaxTemperature, heat);
+                float3 color;
+                color.r = 1.0;
+                color.g = saturate(0.3900815788 * log(temp) - 0.6318414438);
+                color.b = (temp <= 19) ? 0.0 : saturate(0.5432067891 * log(temp - 10) - 1.1962540891);
+
+                return color * heat * heat * _EmissionIntensity;
             }
 
             Varyings vert(Attributes IN)
@@ -128,9 +152,8 @@ Shader "Custom/VolumeRayMarch"
 
                         if (erodedDensity > 0.01)
                         {
-                            float3 fireColor = float3(1.0, 0.4, 0.1) * heat * 3.0;
-                            float3 smokeColor = float3(0.5, 0.5, 0.5);
-                            float3 color = lerp(smokeColor, fireColor, heat);
+                            float thresh = _MinTemperature / _MaxTemperature;
+                            float3 color = (heat < thresh) ? float3(0.0, 0.0, 0.0) : blackbodyColor(heat);
 
                             float alpha = saturate(erodedDensity * _StepSize * 5.0);
 

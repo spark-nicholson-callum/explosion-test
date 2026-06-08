@@ -323,7 +323,7 @@ void Step(uint3 id : SV_DispatchThreadID)
     }
 
     // Temp diffusion (temp)
-    advectedSmokeProps.r = max(0.0, advectedSmokeProps.r - (0.5 * DeltaTime));
+    advectedSmokeProps.r = max(0.0, advectedSmokeProps.r - (0.6 * DeltaTime));
     advectedSmokeProps.g = max(0.0, advectedSmokeProps.g - (0.1 * DeltaTime));
 
     SmokePropWrite[id] = advectedSmokeProps;

@@ -427,9 +427,9 @@ MonoBehaviour:
   simScale: 1
   injectRadius: 0.4
   injectionPoint: {fileID: 209003762}
-  expansionForce: 100
+  expansionForce: 80
   pressureIterations: 40
-  buoyancyStrength: 30
+  buoyancyStrength: 45
   smokeWeight: 4
   vorticityStrength: 25
   ambientWindScale: 1.4
