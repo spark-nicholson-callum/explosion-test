@@ -23,7 +23,9 @@
 ### レイマーチング
 
 普通の描画だとオブジェクトの表面の情報しか必要ありませんが、今回はオブジェクトの中の情報も必要になります。
+
 解決方法は割と簡単です。フラグメントシェーダーでカメラからピクセルに向かって線（レイ）を飛ばし、その線に沿ってオブジェクトの中を少しずつ（一歩ずつ）進んでいきます。
+
 いろいろと最適化はできますが、基本はそれだけです。歩幅（ステップサイズ）と回数を決めて、1歩ずつ進みながらボリュームテクスチャのデータをサンプリング（取得）します。
 そして、取得したすべてのデータを重ね合わせて描画すれば終わりです。
 
@@ -36,6 +38,203 @@
 一番重要なのは、炎がプレイヤーの動きからちゃんと影響を受けられることです。
 プレイヤーのアクションによって炎が煽られて強くなったり、動きに合わせてなびいたりできます。
 最終的には、環境にあるオブジェクトと相互作用することも可能です。木製のものを加熱したり、燃料を爆発させたりといったこともできるようになります。
+
+## 流体シミュレーションのシェーダー
+
+数学の部分が怖いので最後に記載しましたが、本当は先に読むべきです。まあ読まなくても分れるように頑張りますが。
+
+流体シミュレーションはボクセルごと処理がまったく同じので全部非同期で処理行えます。
+これがGPUにピッタリのタスクのでコンピュートシェーダーで行います。
+使ったことがないなら怖そう言葉ですが、描画しないシェーダーって意味だけです。
+
+基本的に以下の処理を行います：
+
+1. 外部の力の影響を計算する
+2. 速度の発散を計算する
+3. 発散情報を利用して圧力を計算する(数回反復する）
+4. 圧力の影響を速度に加算する
+5. 移流の処理を行う
+
+#### 外部の力
+これはとても簡単です、みんなが学んだニュートン方式と同じです。
+基本的に必要のは浮力と重力です。
+浮力が温度にが高いほどに強い、重力が密度が高いほど強い
+
+```hlsl
+// Buoyancy
+float buoyancyForce = (heat * Buoyancy) - (smokeDensity * SmokeWeight);
+vel.y += buoyancyForce * DeltaTime;
+```
+
+ここの `Buoyancy` と `SmokeWeight` がシェーダー外で設定できるパラメータだけです。
+物理的に性格な値が必要はありません。
+
+#### 速度の発散
+圧力の計算に必要です。圧力のループの外に置く形が効率いいので別のステップに分けています。
+微分を計算しますが、これは周りの値の差だけで計算しています
+
+```hlsl
+uint3 pos = groupThreadId + uint3(1, 1, 1); // Offset for the padding
+
+float3 vL = velCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+float3 vR = velCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+float3 vD = velCache[GetCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+float3 vU = velCache[GetCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+float3 vB = velCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+float3 vF = velCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
+
+float dx = BoundsSize.x / float(Resolution);
+float div = ((vR.x - vL.x) + (vU.y - vD.y) + (vF.z - vB.z)) / (2.0 * dx);
+```
+
+隣のボクセルのデータを取得していますので、同じ情報を複数回取得することがかなりあります。
+そのために私の実装だとキャッシュしています、最適化の所で説明します。
+
+#### 圧力の計算
+
+圧倒的に一番重い処理がこちらです。
+ポアソン方程式を溶ける必要ですが、解析解が不可能です。
+ですので、反復法でちょっとずつ近づく形にします。
+
+基本的に以下の処理を~40回繰り返します。
+これはヤコビ法っといいます
+
+```hlsl
+float pL = pressureCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+float pR = pressureCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+float pD = pressureCache[GetCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+float pU = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+float pB = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+float pF = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
+
+float dx = BoundsSize.x / float(Resolution);
+float div = DivergenceRead[id];
+PressureWrite[id] = (pL + pR + pD + pU + pB + pF - (dx * dx * div)) / 6.0;
+```
+
+もっと早いやり方がもちろん存在しいますが、これが一番実装しやすいやり方ですね。
+今回は十分ですがマルチグリッド法などを実装するべきかと思います。
+
+#### 圧力の力
+外部の力と同じように速度に加算します。
+ただ、発散が外部の力による影響がありまして、圧力が発散による影響があるため別のステップにする必要です。
+
+```hlsl
+float pL = pressureCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+float pR = pressureCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+float pD = pressureCache[GetCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+float pU = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+float pB = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+float pF = pressureCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
+
+float dx = BoundsSize.x / float(Resolution);
+float3 vel = VelocityRead[id].xyz;
+vel.x -= (pR - pL) / (2.0 * dx);
+vel.y -= (pU - pD) / (2.0 * dx);
+vel.z -= (pF - pB) / (2.0 * dx);
+VelocityWrite[id] = float4(vel, 0.0);
+```
+
+#### 移流
+理論上は移流が普通のゲームオブジェクトの動きと同じです、速度を位置に加算して終わりのはずです。
+ですが、1つの大きい問題があります。
+
+きれいに1つのボクセルが他のボクセルに移動するのわけがありません。
+もっとあり得るのはボクセルの間まで移動します。
+
+解決し方がどこまで行くではなく、どこから来たの計算を行います。
+これもボクセルの間になりますが、ただのサンプリングで lerp した値を取得できます。
+
+```hlsl
+// +.5 to sample the center of the the voxel
+float3 uvw = ((float3(id) + 0.5) / float(Resolution));
+float3 uvwVel = VelocityRead[id].xyz / BoundsSize;
+float3 prevUvw = uvw - (uvwVel * DeltaTime * SimScale);
+
+float4 advectedSmokeProps = SmokePropRead.SampleLevel(sampler_LinearClamp, prevUvw, 0);
+float4 advectedVel = VelocityRead.SampleLevel(sampler_LinearClamp, prevUvw, 0);
+```
+
+### エミッターについて
+温度と煙のエミッターがとても分かりやすいですね。
+ただそのボクセルのデータを上書きすれば大丈夫です。
+
+```hlsl
+if (insideEmitter(em, cellWorldPos))
+{
+    advectedSmokeProps.r = max(advectedSmokeProps.r, em.heat);
+    advectedSmokeProps.g = max(advectedSmokeProps.g, em.density);
+}
+```
+
+ですが、圧力のエミッターも実装してあります。
+圧力が発散を抵抗するように実装してありますので、直接いじるのは難しいです。
+でうすので、エミッターが発散を上書きすればいいです。
+
+```hlsl
+
+if (insideEmitter(em, worldPos))
+{
+    div -= em.expansion;
+}
+```
+
+### 最適化
+まだまだ可能ですが、とにかく影響大きいの1つの最適化を行いました。
+
+#### 共有メモリのキャッシュ
+ボクセルの隣のデータを取得するの時がかなりあります。
+スレッドグループが `8 x 8 x 8` の場合は `8 x 8 x 8 x 6 = 3072` 回テクスチャをサンプルする。
+ですがすべてのデータが `10 x 10 x 10 = 1000` ボクセルのキューブに入っています。
+平均同じデータを3回読み込んでいます！
+
+それを解決するためにまずその1000ボクセル分のデータを読み込んで、キャッシュする。
+VRAMよりSRAMの読み込みが早いのでこれは全体的に早くなります。
+
+### 見た目強化
+これまでの炎がかなり不自然な物になりますね。問題が大体2つあります。
+
+1. 自然の空気がちょっとでも、いつも動いています。これが炎に影響します。
+2. ボクセルのシミュレーションするとボーテックスがどんどん弱まります。
+
+1つずつ説明いたします。
+
+#### 環境風
+ノイズの関数が一番ですが、単純のサインウェーブの風でかなり見た目よくなります
+
+```hlsl
+float3 wind;
+wind.x = sin(worldPos.y * AmbientWindScale + Time) * cos(worldPos.z * AmbientWindScale + Time);
+wind.y = sin(worldPos.z * AmbientWindScale + Time) * cos(worldPos.x * AmbientWindScale + Time);
+wind.z = sin(worldPos.x * AmbientWindScale + Time) * cos(worldPos.y * AmbientWindScale + Time);
+
+vel += wind * AmbientWindSpeed * DeltaTime;
+```
+
+#### ボルティシティ・コンファイメント
+空間と時間が区切るせいで、ボルテックスが弱まることが実はあります。
+渦の感じがすごく流体っぽいので守りたい。そのために回転を計算して、ちょっと無理やり加算する
+
+```hlsl
+float wL = vorticityCache[GetCacheIndex(uint3(pos + int3(-1,  0,  0)))];
+float wR = vorticityCache[GetCacheIndex(uint3(pos + int3( 1,  0,  0)))];
+float wD = vorticityCache[GetCacheIndex(uint3(pos + int3( 0, -1,  0)))];
+float wU = vorticityCache[GetCacheIndex(uint3(pos + int3( 0,  1,  0)))];
+float wB = vorticityCache[GetCacheIndex(uint3(pos + int3( 0,  0, -1)))];
+float wF = vorticityCache[GetCacheIndex(uint3(pos + int3( 0,  0,  1)))];
+
+float dx = BoundsSize.x / float(Resolution);
+float3 eta = float3(wR - wL, wU - wD, wF - wB) / (2.0 * dx);
+
+if (length(eta) > 0.001)
+{
+    float3 N = normalize(eta);
+    float3 curl = CurlRead[id].xyz;
+
+    float3 vorticityForce = VorticityStrength * cross(N, curl) * dx;
+    vel += vorticityForce * DeltaTime;
+}
+```
 
 ## 最低限の流体力学
 
