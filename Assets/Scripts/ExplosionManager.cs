@@ -22,6 +22,13 @@ public class ExplosionManager : MonoBehaviour
     [SerializeField] private float ambientWindScale = 1.5f;
     [SerializeField] private float ambientWindSpeed = 2.0f;
 
+    [Header("Explosion")]
+    [SerializeField] private float ignitionTemp = 0.5f;
+    [SerializeField] private float burnRate = 10.0f;
+    [SerializeField] private float smokeEmission = 2.0f;
+    [SerializeField] private float heatEmission = 5.0f;
+    [SerializeField] private float burnExpansion = 50.0f;
+
     [Header("Debugging")]
     [SerializeField] private DebugMode debugMode = DebugMode.None;
     [SerializeField] private MeshRenderer debugQuad;
@@ -114,9 +121,10 @@ public class ExplosionManager : MonoBehaviour
 
         // Injection parameters / Emitters
         bool spacePressed = (Keyboard.current != null && Keyboard.current.spaceKey.isPressed);
+        spacePressed = true;
         fluidSimCompute.SetBool("IsInjecting", spacePressed);
 
-        FluidEmitter[] emitters = transform.GetComponentsInChildren<FluidEmitter>();
+        FluidEmitter[] emitters = transform.GetComponentsInChildren<FluidEmitter>(includeInactive: false);
         fluidSimCompute.SetInt("EmitterCount", emitters.Length);
         if (emitters.Length > 0)
         {
@@ -145,6 +153,12 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetTexture(stepKernel, "VelocityRead", velocityTexture.ReadBuffer);
         fluidSimCompute.SetTexture(stepKernel, "VelocityWrite", velocityTexture.WriteBuffer);
 
+        fluidSimCompute.SetFloat("IgnitionTemp", ignitionTemp);
+        fluidSimCompute.SetFloat("BurnRate", burnRate);
+        fluidSimCompute.SetFloat("SmokeEmission", smokeEmission);
+        fluidSimCompute.SetFloat("HeatEmission", heatEmission);
+        fluidSimCompute.SetFloat("BurnExpansion", burnExpansion);
+
         fluidSimCompute.Dispatch(stepKernel, threadGroups, threadGroups, threadGroups);
         smokePropTexture.SwapBuffers();
         velocityTexture.SwapBuffers();
@@ -172,6 +186,7 @@ public class ExplosionManager : MonoBehaviour
 
         // Calculate divergence
         fluidSimCompute.SetTexture(divergenceKernel, "VelocityRead", velocityTexture.ReadBuffer);
+        fluidSimCompute.SetTexture(divergenceKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
         fluidSimCompute.SetTexture(divergenceKernel, "DivergenceWrite", divergenceTexture.WriteBuffer);
 
         fluidSimCompute.Dispatch(divergenceKernel, threadGroups, threadGroups, threadGroups);
