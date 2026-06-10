@@ -75,6 +75,7 @@ float BurnRate;
 float SmokeEmission;
 float HeatEmission;
 float BurnExpansion;
+float SmokeChoke;
 
 // Groupshare Cache
 groupshared float3 velCache[TOTAL_CACHE];
@@ -385,11 +386,14 @@ void Step(uint3 id : SV_DispatchThreadID)
     advectedSmokeProps.a = 0.0;
 
     float heat = advectedSmokeProps.r;
-    float fuel = SmokePropRead[id].b; // pre advected!
+    float smoke = advectedSmokeProps.g;
+    float fuel = advectedSmokeProps.b;
 
     if (fuel > 0.01 && heat >= IgnitionTemp)
     {
-        float burn = fuel * BurnRate * DeltaTime * SimScale;
+        float oxygen = max(0.0, 1.0 - (smoke / SmokeChoke));
+
+        float burn = fuel * oxygen * BurnRate * DeltaTime * SimScale;
         burn = min(burn, fuel);
 
         // Consume fuel

@@ -28,6 +28,7 @@ public class ExplosionManager : MonoBehaviour
     [SerializeField] private float smokeEmission = 2.0f;
     [SerializeField] private float heatEmission = 5.0f;
     [SerializeField] private float burnExpansion = 50.0f;
+    [SerializeField] private float smokeChoke = 10.0f;
 
     [Header("Debugging")]
     [SerializeField] private DebugMode debugMode = DebugMode.None;
@@ -158,6 +159,7 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetFloat("SmokeEmission", smokeEmission);
         fluidSimCompute.SetFloat("HeatEmission", heatEmission);
         fluidSimCompute.SetFloat("BurnExpansion", burnExpansion);
+        fluidSimCompute.SetFloat("SmokeChoke", smokeChoke);
 
         fluidSimCompute.Dispatch(stepKernel, threadGroups, threadGroups, threadGroups);
         smokePropTexture.SwapBuffers();
