@@ -225,6 +225,20 @@ void ExternalForces(
 
     vel += wind * AmbientWindSpeed * DeltaTime;
 
+    // Concussive Blast
+    // TODO // Cache
+    float rL = SmokePropRead[uint3(max(0, (int)id.x - 1), id.y, id.z)].a;
+    float rR = SmokePropRead[uint3(min(Resolution - 1, id.x + 1), id.y, id.z)].a;
+    float rD = SmokePropRead[uint3(id.x, max(0, (int)id.y - 1), id.z)].a;
+    float rU = SmokePropRead[uint3(id.x, min(Resolution - 1, id.y + 1), id.z)].a;
+    float rB = SmokePropRead[uint3(id.x, id.y, max(0, (int)id.z - 1))].a;
+    float rF = SmokePropRead[uint3(id.x, id.y, min(Resolution - 1, id.z + 1))].a;
+
+    // TODO // Expose me
+    float ReactionExpansion = 2.0;
+    float3 reactionGradient = float3(rR - rL, rU - rD, rF - rB) / (2.0 * dx);
+    vel -= ReactionExpansion * reactionGradient * DeltaTime;
+
     VelocityWrite[id] = float4(vel, 0.0);
 }
 
@@ -275,6 +289,10 @@ void ComputeDivergence(
             }
         }
     }
+
+    // TODO // Expose me
+    float ThermalExpansion = 0.1;
+    div -= ThermalExpansion * SmokePropRead[id].r;
 
     // Pressure from reaction
     div -= SmokePropRead[id].a;
