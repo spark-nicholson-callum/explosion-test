@@ -75,7 +75,12 @@ float BurnRate;
 float SmokeEmission;
 float HeatEmission;
 float BurnExpansion;
+float ThermalExpansion;
+float ReactionExpansion;
 float SmokeChoke;
+
+// Misc
+float ThermalDecay;
 
 // Groupshare Cache
 groupshared float3 velCache[TOTAL_CACHE];
@@ -234,8 +239,6 @@ void ExternalForces(
     float rB = SmokePropRead[uint3(id.x, id.y, max(0, (int)id.z - 1))].a;
     float rF = SmokePropRead[uint3(id.x, id.y, min(Resolution - 1, id.z + 1))].a;
 
-    // TODO // Expose me
-    float ReactionExpansion = 2.0;
     float3 reactionGradient = float3(rR - rL, rU - rD, rF - rB) / (2.0 * dx);
     vel -= ReactionExpansion * reactionGradient * DeltaTime;
 
@@ -290,8 +293,6 @@ void ComputeDivergence(
         }
     }
 
-    // TODO // Expose me
-    float ThermalExpansion = 0.1;
     div -= ThermalExpansion * SmokePropRead[id].r;
 
     // Pressure from reaction
@@ -424,7 +425,8 @@ void Step(uint3 id : SV_DispatchThreadID)
     }
 
     // Diffusion (temp)
-    advectedSmokeProps.r = max(0.0, advectedSmokeProps.r - (0.6 * DeltaTime));
+    heat = advectedSmokeProps.r;
+    advectedSmokeProps.r = max(0.0, heat - (ThermalDecay * heat * heat * DeltaTime));
     advectedSmokeProps.g = max(0.0, advectedSmokeProps.g - (0.1 * DeltaTime));
 
     SmokePropWrite[id] = advectedSmokeProps;

@@ -10,6 +10,7 @@ public class ExplosionManager : MonoBehaviour
         Pressure,
     }
 
+    [Header("Simulation")]
     [SerializeField] private ComputeShader fluidSimCompute;
     [SerializeField] private int resolution = 64;
     [SerializeField] private float simScale = 1.0f;
@@ -28,7 +29,12 @@ public class ExplosionManager : MonoBehaviour
     [SerializeField] private float smokeEmission = 2.0f;
     [SerializeField] private float heatEmission = 5.0f;
     [SerializeField] private float burnExpansion = 50.0f;
+    [SerializeField] private float thermalExpansion = 0.1f;
+    [SerializeField] private float reactionExpansion = 2.0f;
     [SerializeField] private float smokeChoke = 10.0f;
+
+    [Header("Misc")]
+    [SerializeField] private float thermalDecay = 0.4f;
 
     [Header("Debugging")]
     [SerializeField] private DebugMode debugMode = DebugMode.None;
@@ -161,6 +167,8 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetFloat("BurnExpansion", burnExpansion);
         fluidSimCompute.SetFloat("SmokeChoke", smokeChoke);
 
+        fluidSimCompute.SetFloat("ThermalDecay", thermalDecay);
+
         fluidSimCompute.Dispatch(stepKernel, threadGroups, threadGroups, threadGroups);
         smokePropTexture.SwapBuffers();
         velocityTexture.SwapBuffers();
@@ -178,6 +186,7 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.SetFloat("VorticityStrength", vorticityStrength);
         fluidSimCompute.SetFloat("AmbientWindScale", ambientWindScale);
         fluidSimCompute.SetFloat("AmbientWindSpeed", ambientWindSpeed);
+        fluidSimCompute.SetFloat("ReactionExpansion", reactionExpansion);
         fluidSimCompute.SetTexture(externalForcesKernel, "VelocityRead", velocityTexture.ReadBuffer);
         fluidSimCompute.SetTexture(externalForcesKernel, "VelocityWrite", velocityTexture.WriteBuffer);
         fluidSimCompute.SetTexture(externalForcesKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
@@ -187,6 +196,7 @@ public class ExplosionManager : MonoBehaviour
         velocityTexture.SwapBuffers();
 
         // Calculate divergence
+        fluidSimCompute.SetFloat("ThermalExpansion", thermalExpansion);
         fluidSimCompute.SetTexture(divergenceKernel, "VelocityRead", velocityTexture.ReadBuffer);
         fluidSimCompute.SetTexture(divergenceKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
         fluidSimCompute.SetTexture(divergenceKernel, "DivergenceWrite", divergenceTexture.WriteBuffer);
