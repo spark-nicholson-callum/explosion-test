@@ -6,8 +6,13 @@ public struct EmitterData
     public int shapeType;           // 4 bytes
     public float heat;              // 4 bytes
     public float density;           // 4 bytes
+    public float fuel;              // 4 bytes
     public float expansion;         // 4 bytes
-    // = 80 bytes = 5 * 16 bytes
+
+    public float padding1;          // 4 bytes
+    public float padding2;          // 4 bytes
+    public float padding3;          // 4 bytes
+    // = 96 bytes = 6 * 16 bytes
 }
 
 public class FluidEmitter : MonoBehaviour
@@ -24,13 +29,14 @@ public class FluidEmitter : MonoBehaviour
     [Header("Emission Data")]
     [SerializeField] private float density = 1.0f;
     [SerializeField] private float heat = 1.0f;
+    [SerializeField] private float fuel = 0.0f;
     [SerializeField] private float expansion = 0.0f;
 
     [Header("Debug")]
     [SerializeField] private bool drawGizmo = true;
     [SerializeField] private Color gizmoColor = new Color(0.1215686f, 0.7058824f, 0.7215686f, 0.5f);
 
-    public const int DataSize = 80;
+    public const int DataSize = 96;
 
     public EmitterData GetEmitterData()
     {
@@ -40,6 +46,7 @@ public class FluidEmitter : MonoBehaviour
             shapeType = (int)shape,
             density = density,
             heat = heat,
+            fuel = fuel,
             expansion = expansion,
         };
     }

@@ -17,10 +17,13 @@ struct Emitter
     int shapeType;
     float heat;
     float density;
+    float fuel;
     float expansion;
+
+    float padding[3];
 };
 
-// r = heat, g = smoke density
+// r = heat, g = smoke density, b = fuel
 RWTexture3D<float4> VelocityWrite;
 Texture3D<float4> VelocityRead;
 
@@ -360,6 +363,7 @@ void Step(uint3 id : SV_DispatchThreadID)
             {
                 advectedSmokeProps.r = max(advectedSmokeProps.r, em.heat);
                 advectedSmokeProps.g = max(advectedSmokeProps.g, em.density);
+                advectedSmokeProps.b = max(advectedSmokeProps.b, em.fuel);
             }
         }
     }
