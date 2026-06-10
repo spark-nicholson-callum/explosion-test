@@ -119,9 +119,13 @@ public class ExplosionManager : MonoBehaviour
     {
         Bounds bounds = GetComponent<Renderer>().bounds;
 
+        // 最低でも 30fps で動く、ラグるときは遅くなる
+        // こうしないとシミュレーションがめちゃくちゃになります。
+        float safeDeltaTime = Mathf.Min(Time.deltaTime, 1.0f / 30.0f);
+
         // Global parameters
         fluidSimCompute.SetFloat("Time", Time.time);
-        fluidSimCompute.SetFloat("DeltaTime", Time.deltaTime);
+        fluidSimCompute.SetFloat("DeltaTime", safeDeltaTime);
         fluidSimCompute.SetFloat("SimScale", simScale);
         fluidSimCompute.SetVector("BoundsMin", bounds.min);
         fluidSimCompute.SetVector("BoundsSize", bounds.size);
