@@ -460,8 +460,9 @@ void Step(uint3 id : SV_DispatchThreadID)
 
     // Diffusion (temp)
     heat = advectedSmokeProps.r;
+    smoke = advectedSmokeProps.g;
     advectedSmokeProps.r = max(0.0, heat - (ThermalDecay * heat * heat * DeltaTime));
-    advectedSmokeProps.g = max(0.0, advectedSmokeProps.g - (0.1 * DeltaTime));
+    advectedSmokeProps.g = max(0.0, smoke - (0.2 * smoke * DeltaTime));
 
     SmokePropWrite[id] = advectedSmokeProps;
     VelocityWrite[id] = advectedVel;
