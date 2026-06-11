@@ -8,6 +8,7 @@ public class ExplosionManager : MonoBehaviour
         None,
         Divergence,
         Pressure,
+        Shadows,
     }
 
     [Header("Simulation")]
@@ -36,6 +37,12 @@ public class ExplosionManager : MonoBehaviour
     [Header("Misc")]
     [SerializeField] private float thermalDecay = 0.4f;
 
+    [Header("Lighting")]
+    [SerializeField] private Light mainLight;
+    [SerializeField] private float shadowStepSize = 0.05f;
+    [SerializeField] private float shadowAbsorption = 5.0f;
+    [SerializeField] private float shadowSteps = 16;
+
     [Header("Debugging")]
     [SerializeField] private DebugMode debugMode = DebugMode.None;
     [SerializeField] private MeshRenderer debugQuad;
@@ -48,6 +55,7 @@ public class ExplosionManager : MonoBehaviour
     private DoubleBuffer<RenderTexture> divergenceTexture;
     private DoubleBuffer<RenderTexture> pressureTexture;
     private DoubleBuffer<RenderTexture> smokePropTexture;
+    private RenderTexture shadowTexture;
     private Material rayMarchMaterial;
 
     private ComputeBuffer emitterBuffer;
@@ -63,6 +71,7 @@ public class ExplosionManager : MonoBehaviour
     private int pressureKernel;
     private int projectVelocityKernel;
     private int stepKernel;
+    private int shadowKernel;
 
     private int threadGroups;
 
@@ -75,6 +84,7 @@ public class ExplosionManager : MonoBehaviour
         pressureKernel        = fluidSimCompute.FindKernel("PressureIteration");
         projectVelocityKernel = fluidSimCompute.FindKernel("ProjectVelocity");
         stepKernel            = fluidSimCompute.FindKernel("Step");
+        shadowKernel          = fluidSimCompute.FindKernel("CalculateShadows");
         fluidSimCompute.SetInt("Resolution", resolution);
 
         uint groupSize;
@@ -87,6 +97,7 @@ public class ExplosionManager : MonoBehaviour
         divergenceTexture = new(() => CreateVolume(RenderTextureFormat.RHalf));
         pressureTexture   = new(() => CreateVolume(RenderTextureFormat.RHalf));
         smokePropTexture  = new(() => CreateVolume());
+        shadowTexture = CreateVolume(RenderTextureFormat.RHalf);
 
         for (int i = 0; i < 2; ++i)
         {
@@ -95,6 +106,7 @@ public class ExplosionManager : MonoBehaviour
             fluidSimCompute.SetTexture(initKernel, "DivergenceWrite", divergenceTexture.WriteBuffer);
             fluidSimCompute.SetTexture(initKernel, "PressureWrite", pressureTexture.WriteBuffer);
             fluidSimCompute.SetTexture(initKernel, "SmokePropWrite", smokePropTexture.WriteBuffer);
+            fluidSimCompute.SetTexture(initKernel, "ShadowWrite", shadowTexture);
             fluidSimCompute.Dispatch(initKernel, threadGroups, threadGroups, threadGroups);
 
             velocityTexture.SwapBuffers();
@@ -266,6 +278,24 @@ public class ExplosionManager : MonoBehaviour
         fluidSimCompute.Dispatch(projectVelocityKernel, threadGroups, threadGroups, threadGroups);
         velocityTexture.SwapBuffers();
 
+        // Calculate Shadows
+        if (mainLight != null)
+        {
+            Vector3 lightDir = -mainLight.transform.forward;
+            fluidSimCompute.SetVector("LightDirection", lightDir);
+        }
+        else
+        {
+            fluidSimCompute.SetVector("LightDirection", Vector3.up);
+        }
+        fluidSimCompute.SetFloat("ShadowStepSize", shadowStepSize);
+        fluidSimCompute.SetFloat("ShadowAbsorption", shadowAbsorption);
+        fluidSimCompute.SetFloat("ShadowSteps", shadowSteps);
+        fluidSimCompute.SetTexture(shadowKernel, "SmokePropRead", smokePropTexture.ReadBuffer);
+        fluidSimCompute.SetTexture(shadowKernel, "ShadowWrite", shadowTexture);
+
+        fluidSimCompute.Dispatch(shadowKernel, threadGroups, threadGroups, threadGroups);
+
         // Share result with ray march material for rendering
         rayMarchMaterial.SetTexture("_VolumeTex", smokePropTexture.ReadBuffer);
 
@@ -290,6 +320,9 @@ public class ExplosionManager : MonoBehaviour
             case DebugMode.Pressure:
                 debugMat.SetTexture("_VolumeTex", pressureTexture.ReadBuffer);
                 break;
+            case DebugMode.Shadows:
+                debugMat.SetTexture("_VolumeTex", shadowTexture);
+                break;
         }
     }
 
@@ -300,6 +333,7 @@ public class ExplosionManager : MonoBehaviour
         divergenceTexture.ForEach(t => {if (t != null) t.Release();});
         pressureTexture.ForEach(t => {if (t != null) t.Release();});
         velocityTexture.ForEach(t => {if (t != null) t.Release();});
+        if (shadowTexture != null) shadowTexture.Release();
         if (emitterBuffer != null) emitterBuffer.Release();
         if (particleBuffer != null) particleBuffer.Release();
     }

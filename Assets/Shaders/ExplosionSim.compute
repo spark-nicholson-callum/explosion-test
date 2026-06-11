@@ -11,6 +11,8 @@
 #pragma kernel ProjectVelocity
 #pragma kernel Step
 
+#pragma kernel CalculateShadows
+
 struct Emitter
 {
     float4x4 worldToLocal;
@@ -49,6 +51,8 @@ Texture3D<float> PressureRead;
 
 RWTexture3D<float4> SmokePropWrite;
 Texture3D<float4> SmokePropRead;
+
+RWTexture3D<float> ShadowWrite;
 
 StructuredBuffer<Emitter> Emitters;
 uint EmitterCount;
@@ -92,6 +96,12 @@ float BurnExpansion;
 float ThermalExpansion;
 float ReactionExpansion;
 float SmokeChoke;
+
+// Lighting
+float3 LightDirection;
+float ShadowStepSize;
+float ShadowAbsorption;
+float ShadowSteps;
 
 // Misc
 float ThermalDecay;
@@ -143,6 +153,7 @@ void Init(uint3 id : SV_DispatchThreadID)
     DivergenceWrite[id] = 0.0;
     PressureWrite[id] = 0.0;
     SmokePropWrite[id] = float4(0.0, 0.0, 0.0, 0.0);
+    ShadowWrite[id] = 0.0;
 }
 
 [numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
@@ -466,4 +477,31 @@ void Step(uint3 id : SV_DispatchThreadID)
 
     SmokePropWrite[id] = advectedSmokeProps;
     VelocityWrite[id] = advectedVel;
+}
+
+[numthreads(GROUP_SIZE, GROUP_SIZE, GROUP_SIZE)]
+void CalculateShadows(uint3 id : SV_DispatchThreadID)
+{
+    if (id.x >= Resolution || id.y >= Resolution || id.z >= Resolution) return;
+    // +.5 to sample the center of the the voxel
+    float3 uvw = ((float3(id) + 0.5) / float(Resolution));
+    float3 uvwStep = (LightDirection / BoundsSize) * ShadowStepSize;
+
+    float totalDensity = 0.0;
+
+    float3 rayPos = uvw;
+
+    for (int i = 0; i < ShadowSteps; i++)
+    {
+        rayPos += uvwStep;
+
+        if (any(rayPos < 0.0) || any(rayPos > 1.0))
+            break;
+
+        float density = SmokePropRead.SampleLevel(sampler_LinearClamp, rayPos, 0).g;
+        totalDensity += density;
+    }
+
+    float transmission = exp(-totalDensity * ShadowStepSize * ShadowAbsorption);
+    ShadowWrite[id] = transmission;
 }

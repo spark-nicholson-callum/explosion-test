@@ -3,7 +3,13 @@ Shader "Custom/VolumeRayMarch"
     Properties
     {
         _VolumeTex ("Volume Texture (3D)", 3D) = "" {}
+        _ShadowTex ("Shadow Texture (3D)", 3D) = "" {}
         _StepSize ("Step Size", Range(0.01, 0.1)) = 0.02
+
+        [Header(Lighting)]
+        _MainLightColor ("Direct Light Color", Color) = (1.0, 0.95, 0.9, 1.0)
+        _AmbientColor ("Ambient Shadow Color", Color) = (0.15, 0.2, 0.25, 1.0)
+        _SmokeAlbedo ("Smoke Base Color", Color) = (0.8, 0.8, 0.8, 1.0)
 
         [Header(fBM Noise Settings)]
         _NoiseScale ("Noise Scale", Float) = 10.0
@@ -50,6 +56,7 @@ Shader "Custom/VolumeRayMarch"
             };
 
             TEXTURE3D(_VolumeTex);
+            TEXTURE3D(_ShadowTex);
             SAMPLER(sampler_VolumeTex);
 
             CBUFFER_START(UnityperMaterial)
@@ -61,6 +68,9 @@ Shader "Custom/VolumeRayMarch"
                 float _MinTemperature;
                 float _MaxTemperature;
                 float _EmissionIntensity;
+
+                float4 _AmbientColor;
+                float4 _SmokeAlbedo;
             CBUFFER_END
 
             float random(float2 st)
@@ -116,7 +126,10 @@ Shader "Custom/VolumeRayMarch"
                 color.g = saturate(0.3900815788 * log(temp) - 0.6318414438);
                 color.b = (temp <= 19) ? 0.0 : saturate(0.5432067891 * log(temp - 10) - 1.1962540891);
 
-                return color * heat * heat * _EmissionIntensity;
+                color = color * heat * heat * _EmissionIntensity;
+                color = max(color, float3(0.1, 0.1, 0.1));
+
+                return color;
             }
 
             Varyings vert(Attributes IN)
@@ -139,14 +152,16 @@ Shader "Custom/VolumeRayMarch"
                 rayPos += rayDir * (jitter * _StepSize);
                 IN.worldPos += normalize(IN.worldPos - GetCameraPositionWS()) * (jitter * _StepSize);
 
-                float4 finalColor = float4(0,0,0,0);
+                float3 finalColor = float3(0.0, 0.0, 0.0);
 
                 // _Time is a float4 in URP, .y is unscaled time
                 float3 noiseOffset = float3(0, -_Time.y * _NoiseSpeed, 0);
 
+                float transparency = 1.0;
                 for (int step = 0; step < 32; step++)
                 {
                     if (any(rayPos < 0) || any(rayPos > 1)) break;
+                    if (transparency < 0.01) break;
 
                     // URP texture sampling macro
                     float4 volumeData = SAMPLE_TEXTURE3D(_VolumeTex, sampler_VolumeTex, rayPos);
@@ -163,13 +178,20 @@ Shader "Custom/VolumeRayMarch"
 
                         if (erodedDensity > 0.01)
                         {
+                            float voxelAlpha = erodedDensity * _StepSize * 5.0;
+
+                            float lightTransmission = SAMPLE_TEXTURE3D(_ShadowTex, sampler_VolumeTex, rayPos).r;
+
+                            float3 directLight = _MainLightColor.rgb * lightTransmission;
+                            float3 totalLight  = directLight + _AmbientColor.rgb;
+
+                            float3 smokeColor = _SmokeAlbedo.rgb * totalLight * erodedDensity * _StepSize;
+
                             float thresh = _MinTemperature / _MaxTemperature;
-                            float3 color = (heat < thresh) ? float3(0.0, 0.0, 0.0) : blackbodyColor(heat);
+                            float3 fireColor = (heat < thresh) ? float3(0.0, 0.0, 0.0) : blackbodyColor(heat);
 
-                            float alpha = saturate(erodedDensity * _StepSize * 5.0);
-
-                            finalColor.rgb += color * alpha * (1.0 - finalColor.a);
-                            finalColor.a += alpha * (1.0 - finalColor.a);
+                            finalColor += (smokeColor + fireColor) * transparency;
+                            transparency *= (1.0 - voxelAlpha);
                         }
                     }
 
@@ -177,7 +199,7 @@ Shader "Custom/VolumeRayMarch"
                     IN.worldPos += normalize(IN.worldPos - GetCameraPositionWS()) * _StepSize;
                 }
 
-                return half4(finalColor);
+                return half4(finalColor, 1.0 - transparency);
             }
             ENDHLSL
         }

@@ -5145,7 +5145,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!108 &312765082
 Light:
   m_ObjectHideFlags: 0
@@ -5696,6 +5696,10 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  mainLight: {fileID: 0}
+  shadowStepSize: 0.05
+  shadowAbsorption: 5
+  shadowSteps: 16
   debugMode: 0
   debugQuad: {fileID: 358543287}
   zSlice: 0.5
@@ -6063,6 +6067,10 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  mainLight: {fileID: 312765082}
+  shadowStepSize: 0.05
+  shadowAbsorption: 5
+  shadowSteps: 16
   debugMode: 0
   debugQuad: {fileID: 1126455083}
   zSlice: 0.5
@@ -6212,6 +6220,10 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  mainLight: {fileID: 0}
+  shadowStepSize: 0.05
+  shadowAbsorption: 5
+  shadowSteps: 16
   debugMode: 0
   debugQuad: {fileID: 845916033}
   zSlice: 0.5
@@ -6362,6 +6374,10 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  mainLight: {fileID: 0}
+  shadowStepSize: 0.05
+  shadowAbsorption: 5
+  shadowSteps: 16
   debugMode: 0
   debugQuad: {fileID: 650312463}
   zSlice: 0.5
@@ -6676,6 +6692,10 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  mainLight: {fileID: 0}
+  shadowStepSize: 0.05
+  shadowAbsorption: 5
+  shadowSteps: 16
   debugMode: 0
   debugQuad: {fileID: 1629574680}
   zSlice: 0.5
@@ -12256,6 +12276,10 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  mainLight: {fileID: 0}
+  shadowStepSize: 0.05
+  shadowAbsorption: 5
+  shadowSteps: 16
   debugMode: 0
   debugQuad: {fileID: 1528302563}
   zSlice: 0.5
@@ -12518,6 +12542,10 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  mainLight: {fileID: 0}
+  shadowStepSize: 0.05
+  shadowAbsorption: 5
+  shadowSteps: 16
   debugMode: 0
   debugQuad: {fileID: 1805367868}
   zSlice: 0.5
@@ -12821,7 +12849,7 @@ MonoBehaviour:
   pressureIterations: 40
   buoyancyStrength: 18
   smokeWeight: 2
-  vorticityStrength: 15
+  vorticityStrength: 10
   ambientWindScale: 1.4
   ambientWindSpeed: 0.5
   ignitionTemp: 0.5
@@ -12833,6 +12861,10 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 1
+  mainLight: {fileID: 312765082}
+  shadowStepSize: 0.05
+  shadowAbsorption: 5
+  shadowSteps: 16
   debugMode: 0
   debugQuad: {fileID: 1174584247}
   zSlice: 0.5
@@ -12982,6 +13014,10 @@ MonoBehaviour:
   reactionExpansion: 2
   smokeChoke: 10
   thermalDecay: 0.4
+  mainLight: {fileID: 0}
+  shadowStepSize: 0.05
+  shadowAbsorption: 5
+  shadowSteps: 16
   debugMode: 0
   debugQuad: {fileID: 460957307}
   zSlice: 0.5
