@@ -12871,15 +12871,15 @@ MonoBehaviour:
   ambientWindScale: 1.4
   ambientWindSpeed: 0.5
   ignitionTemp: 0.5
-  burnRate: 8
+  burnRate: 4
   smokeEmission: 6
   heatEmission: 5
-  burnExpansion: 300
-  thermalExpansion: 0.5
-  reactionExpansion: 2
-  smokeChoke: 10
+  burnExpansion: 200
+  thermalExpansion: 0.88
+  reactionExpansion: 1.68
+  smokeChoke: 20
   thermalDecay: 1
-  mainLight: {fileID: 312765082}
+  mainLight: {fileID: 0}
   shadowStepSize: 0.05
   shadowAbsorption: 5
   shadowSteps: 16

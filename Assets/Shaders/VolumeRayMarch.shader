@@ -7,7 +7,7 @@ Shader "Custom/VolumeRayMarch"
         _StepSize ("Step Size", Range(0.01, 0.1)) = 0.02
 
         [Header(Lighting)]
-        _MainLightColor ("Direct Light Color", Color) = (1.0, 0.95, 0.9, 1.0)
+        _SmokeMainLightColor ("Direct Light Color", Color) = (1.0, 0.95, 0.9, 1.0)
         _AmbientColor ("Ambient Shadow Color", Color) = (0.15, 0.2, 0.25, 1.0)
         _SmokeAlbedo ("Smoke Base Color", Color) = (0.8, 0.8, 0.8, 1.0)
 
@@ -59,7 +59,7 @@ Shader "Custom/VolumeRayMarch"
             TEXTURE3D(_ShadowTex);
             SAMPLER(sampler_VolumeTex);
 
-            CBUFFER_START(UnityperMaterial)
+            CBUFFER_START(UnityPerMaterial)
                 float _StepSize;
                 float _NoiseScale;
                 float _NoiseStrength;
@@ -69,6 +69,7 @@ Shader "Custom/VolumeRayMarch"
                 float _MaxTemperature;
                 float _EmissionIntensity;
 
+                float4 _SmokeMainLightColor;
                 float4 _AmbientColor;
                 float4 _SmokeAlbedo;
             CBUFFER_END
@@ -127,7 +128,6 @@ Shader "Custom/VolumeRayMarch"
                 color.b = (temp <= 19) ? 0.0 : saturate(0.5432067891 * log(temp - 10) - 1.1962540891);
 
                 color = color * heat * heat * _EmissionIntensity;
-                color = max(color, float3(0.1, 0.1, 0.1));
 
                 return color;
             }
@@ -178,14 +178,14 @@ Shader "Custom/VolumeRayMarch"
 
                         if (erodedDensity > 0.01)
                         {
-                            float voxelAlpha = erodedDensity * _StepSize * 5.0;
+                            float voxelAlpha = erodedDensity * _StepSize * 10.0;
 
                             float lightTransmission = SAMPLE_TEXTURE3D(_ShadowTex, sampler_VolumeTex, rayPos).r;
 
-                            float3 directLight = _MainLightColor.rgb * lightTransmission;
+                            float3 directLight = _SmokeMainLightColor.rgb * lightTransmission;
                             float3 totalLight  = directLight + _AmbientColor.rgb;
 
-                            float3 smokeColor = _SmokeAlbedo.rgb * totalLight * erodedDensity * _StepSize;
+                            float3 smokeColor = _SmokeAlbedo.rgb * totalLight * voxelAlpha;
 
                             float thresh = _MinTemperature / _MaxTemperature;
                             float3 fireColor = (heat < thresh) ? float3(0.0, 0.0, 0.0) : blackbodyColor(heat);
