@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
@@ -26,6 +27,7 @@ public class FluidParticleBridge : MonoBehaviour
     private ParticleSystem pSystem;
     private ParticleSystem.Particle[] particles;
     private ParticleFluidData[] fluidData = {};
+    private List<Vector4> customData = new();  
     private int particleCount;
 
     public ParticleFluidData[] FluidData => fluidData;
@@ -36,6 +38,7 @@ public class FluidParticleBridge : MonoBehaviour
         pSystem = GetComponent<ParticleSystem>();
         int maxParticles = pSystem.main.maxParticles;
         particles = new ParticleSystem.Particle[maxParticles];
+        customData = new List<Vector4>(maxParticles);
     }
 
     void LateUpdate()
@@ -43,22 +46,23 @@ public class FluidParticleBridge : MonoBehaviour
         if (pSystem == null) return;
 
         particleCount = pSystem.GetParticles(particles);
+        pSystem.GetCustomParticleData(customData, ParticleSystemCustomData.Custom1);
 
         fluidData = particles
-            .Select(p =>
+            .Zip(customData, (p, d) => new{p, d})
+            .Select(data =>
             {
-               Color32 color = p.GetCurrentColor(pSystem);
-               float radius = p.GetCurrentSize3D(pSystem).magnitude * 0.5f;
-               float alpha = color.a / 255f;
-               return new ParticleFluidData
-               {
-                   position = p.position,
-                   radius = radius,
-                   velocity = p.velocity * velocityMultiplier,
-                   heat = (color.r / 255f) * heatMultiplier * alpha,
-                   density = (color.g / 255f) * densityMultiplier * alpha,
-                   fuel = (color.b / 255f) * fuelMultiplier * alpha,
-               };
+                Color32 color = data.p.GetCurrentColor(pSystem);
+                float alpha = color.a / 255f;
+                return new ParticleFluidData
+                {
+                    position = data.p.position,
+                    radius = data.p.GetCurrentSize3D(pSystem).magnitude * 0.5f,
+                    velocity = data.p.velocity * velocityMultiplier,
+                    heat = data.d.x * heatMultiplier,
+                    density = data.d.y * densityMultiplier * alpha,
+                    fuel = data.d.z * fuelMultiplier * alpha,
+                };
             })
             .ToArray();
     }

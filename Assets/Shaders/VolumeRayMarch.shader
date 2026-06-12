@@ -189,6 +189,7 @@ Shader "Custom/VolumeRayMarch"
 
                             float thresh = _MinTemperature / _MaxTemperature;
                             float3 fireColor = (heat < thresh) ? float3(0.0, 0.0, 0.0) : blackbodyColor(heat);
+                            fireColor = fireColor * erodedDensity * _StepSize;
 
                             finalColor += (smokeColor + fireColor) * transparency;
                             transparency *= (1.0 - voxelAlpha);

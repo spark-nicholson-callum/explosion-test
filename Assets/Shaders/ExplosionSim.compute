@@ -36,7 +36,6 @@ struct Particle
     float2 padding;
 };
 
-// r = heat, g = smoke density, b = fuel, a = reaction
 RWTexture3D<float4> VelocityWrite;
 Texture3D<float4> VelocityRead;
 
@@ -49,6 +48,7 @@ Texture3D<float> DivergenceRead;
 RWTexture3D<float> PressureWrite;
 Texture3D<float> PressureRead;
 
+// r = heat, g = smoke density, b = fuel, a = reaction
 RWTexture3D<float4> SmokePropWrite;
 Texture3D<float4> SmokePropRead;
 
